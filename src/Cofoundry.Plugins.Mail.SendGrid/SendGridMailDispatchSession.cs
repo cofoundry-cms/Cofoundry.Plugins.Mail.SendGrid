@@ -1,5 +1,6 @@
 ﻿using Cofoundry.Core;
 using Cofoundry.Core.Mail;
+using Cofoundry.Core.Mail.Internal;
 using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
