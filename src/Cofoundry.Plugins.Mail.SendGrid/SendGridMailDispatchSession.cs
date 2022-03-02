@@ -5,10 +5,9 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
-namespace Cofoundry.Plugins.Mail.SendGrid
+namespace Cofoundry.Plugins.Mail.SendGrid.Internal
 {
     public class SendGridMailDispatchSession : IMailDispatchSession
     {
@@ -40,12 +39,19 @@ namespace Cofoundry.Plugins.Mail.SendGrid
         public void Add(MailMessage mailMessage)
         {
             var messageToSend = FormatMessage(mailMessage);
+
+            if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+            {
+                _debugMailDispatchSession.Add(mailMessage);
+                return;
+            }
+
             _mailQueue.Enqueue(messageToSend);
         }
 
         public async Task FlushAsync()
         {
-            if (_debugMailDispatchSession != null)
+            if (_mailSettings.SendMode == MailSendMode.LocalDrop)
             {
                 await _debugMailDispatchSession.FlushAsync();
                 return;
@@ -63,10 +69,7 @@ namespace Cofoundry.Plugins.Mail.SendGrid
 
         public void Dispose()
         {
-            if (_debugMailDispatchSession != null)
-            {
-                _debugMailDispatchSession.Dispose();
-            }
+            _debugMailDispatchSession?.Dispose();
         }
 
         private SendGridMessage FormatMessage(MailMessage message)
@@ -112,7 +115,7 @@ namespace Cofoundry.Plugins.Mail.SendGrid
 
         private EmailAddress CreateMailAddress(string email, string displayName)
         {
-            // In other libraries we catch validation exceptions here, but SendGrid does not throw any so it is ommited
+            // In other libraries we catch validation exceptions here, but SendGrid does not throw any so it is omitted
             if (string.IsNullOrEmpty(displayName))
             {
                 return new EmailAddress(email);

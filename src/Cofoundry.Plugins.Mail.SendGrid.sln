@@ -1,9 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26430.13
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32126.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cofoundry.Plugins.Mail.SendGrid", "Cofoundry.Plugins.Mail.SendGrid\Cofoundry.Plugins.Mail.SendGrid.csproj", "{28EE7BA3-A12F-4F17-B653-95AB4C9A1D3A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cofoundry.Plugins.Mail.SendGrid", "Cofoundry.Plugins.Mail.SendGrid\Cofoundry.Plugins.Mail.SendGrid.csproj", "{28EE7BA3-A12F-4F17-B653-95AB4C9A1D3A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SendGridExample", "SendGridExample\SendGridExample.csproj", "{BE4C267F-5545-430C-8EFE-A5203E8F5698}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{2D2385FA-87FB-4FE1-9C47-F105AD8FCF91}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,8 +19,18 @@ Global
 		{28EE7BA3-A12F-4F17-B653-95AB4C9A1D3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{28EE7BA3-A12F-4F17-B653-95AB4C9A1D3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{28EE7BA3-A12F-4F17-B653-95AB4C9A1D3A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE4C267F-5545-430C-8EFE-A5203E8F5698}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE4C267F-5545-430C-8EFE-A5203E8F5698}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE4C267F-5545-430C-8EFE-A5203E8F5698}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE4C267F-5545-430C-8EFE-A5203E8F5698}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BE4C267F-5545-430C-8EFE-A5203E8F5698} = {2D2385FA-87FB-4FE1-9C47-F105AD8FCF91}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {74105766-BAD0-4183-AF4E-744F172B7750}
 	EndGlobalSection
 EndGlobal

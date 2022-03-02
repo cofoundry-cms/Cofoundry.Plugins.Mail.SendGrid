@@ -1,10 +1,8 @@
 ﻿using Cofoundry.Core.DependencyInjection;
 using Cofoundry.Core.Mail;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Cofoundry.Plugins.Mail.SendGrid.Internal;
 
-namespace Cofoundry.Plugins.Mail.SendGrid
+namespace Cofoundry.Plugins.Mail.SendGrid.Registration
 {
     public class SendGridDependencyRegistration : IDependencyRegistration
     {
@@ -15,7 +13,7 @@ namespace Cofoundry.Plugins.Mail.SendGrid
             var overrideOptions = RegistrationOptions.Override();
 
             container
-                .Register<IMailDispatchService, SendGridMailDispatchService>(overrideOptions)
+                .Register<IMailDispatchSession, SendGridMailDispatchSession>(overrideOptions)
                 ;
         }
     }
