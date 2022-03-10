@@ -26,8 +26,7 @@ namespace SendGridExample
         public string Subject => "Example Mail";
 
         /// <summary>
-        /// Here we add the contact request as a custom property so we can
-        /// write it out in our view.
+        /// This is a custom property to hold some data that we'd like to render in our view file.
         /// </summary>
         public string Message { get; set; }
     }
