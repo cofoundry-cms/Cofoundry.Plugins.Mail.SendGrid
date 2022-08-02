@@ -3,138 +3,134 @@ using Cofoundry.Core.Mail;
 using Cofoundry.Core.Mail.Internal;
 using SendGrid;
 using SendGrid.Helpers.Mail;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
-namespace Cofoundry.Plugins.Mail.SendGrid.Internal
+namespace Cofoundry.Plugins.Mail.SendGrid.Internal;
+
+public class SendGridMailDispatchSession : IMailDispatchSession
 {
-    public class SendGridMailDispatchSession : IMailDispatchSession
+    private readonly Queue<SendGridMessage> _mailQueue = new Queue<SendGridMessage>();
+    private readonly Core.Mail.MailSettings _mailSettings;
+    private readonly SendGridSettings _sendGridSettings;
+    private readonly SendGridClient _sendGridClient;
+    private readonly DebugMailDispatchSession _debugMailDispatchSession;
+
+    public SendGridMailDispatchSession(
+        Core.Mail.MailSettings mailSettings,
+        SendGridSettings sendGridSettings,
+        IPathResolver pathResolver
+        )
     {
-        private readonly Queue<SendGridMessage> _mailQueue = new Queue<SendGridMessage>();
-        private readonly Core.Mail.MailSettings _mailSettings;
-        private readonly SendGridSettings _sendGridSettings;
-        private readonly SendGridClient _sendGridClient;
-        private readonly DebugMailDispatchSession _debugMailDispatchSession;
+        _mailSettings = mailSettings;
+        _sendGridSettings = sendGridSettings;
 
-        public SendGridMailDispatchSession(
-            Core.Mail.MailSettings mailSettings,
-            SendGridSettings sendGridSettings,
-            IPathResolver pathResolver
-            )
+        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
         {
-            _mailSettings = mailSettings;
-            _sendGridSettings = sendGridSettings;
+            _debugMailDispatchSession = new DebugMailDispatchSession(mailSettings, pathResolver);
+        }
+        else
+        {
+            _sendGridClient = new SendGridClient(_sendGridSettings.ApiKey);
+        }
+    }
 
-            if (_mailSettings.SendMode == MailSendMode.LocalDrop)
-            {
-                _debugMailDispatchSession = new DebugMailDispatchSession(mailSettings, pathResolver);
-            }
-            else
-            {
-                _sendGridClient = new SendGridClient(_sendGridSettings.ApiKey);
-            }
+    public void Add(MailMessage mailMessage)
+    {
+        var messageToSend = FormatMessage(mailMessage);
+
+        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+        {
+            _debugMailDispatchSession.Add(mailMessage);
+            return;
         }
 
-        public void Add(MailMessage mailMessage)
+        _mailQueue.Enqueue(messageToSend);
+    }
+
+    public async Task FlushAsync()
+    {
+        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
         {
-            var messageToSend = FormatMessage(mailMessage);
-
-            if (_mailSettings.SendMode == MailSendMode.LocalDrop)
-            {
-                _debugMailDispatchSession.Add(mailMessage);
-                return;
-            }
-
-            _mailQueue.Enqueue(messageToSend);
+            await _debugMailDispatchSession.FlushAsync();
+            return;
         }
 
-        public async Task FlushAsync()
+        while (_mailQueue.Count > 0)
         {
-            if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+            var mailItem = _mailQueue.Dequeue();
+            if (mailItem != null && _mailSettings.SendMode != MailSendMode.DoNotSend)
             {
-                await _debugMailDispatchSession.FlushAsync();
-                return;
-            }
-
-            while (_mailQueue.Count > 0)
-            {
-                var mailItem = _mailQueue.Dequeue();
-                if (mailItem != null && _mailSettings.SendMode != MailSendMode.DoNotSend)
-                {
-                    await _sendGridClient.SendEmailAsync(mailItem);
-                }
+                await _sendGridClient.SendEmailAsync(mailItem);
             }
         }
+    }
 
-        public void Dispose()
+    public void Dispose()
+    {
+        _debugMailDispatchSession?.Dispose();
+    }
+
+    private SendGridMessage FormatMessage(MailMessage message)
+    {
+        if (message == null) throw new ArgumentNullException(nameof(message));
+
+        var messageToSend = new SendGridMessage();
+
+        var toAddress = GetMailToAddress(message);
+        messageToSend.AddTo(toAddress);
+        messageToSend.Subject = message.Subject;
+        if (message.From != null)
         {
-            _debugMailDispatchSession?.Dispose();
+            messageToSend.SetFrom(CreateMailAddress(message.From.Address, message.From.DisplayName));
+        }
+        else
+        {
+            messageToSend.SetFrom(CreateMailAddress(_mailSettings.DefaultFromAddress, _mailSettings.DefaultFromAddressDisplayName));
         }
 
-        private SendGridMessage FormatMessage(MailMessage message)
+        SetMessageBody(messageToSend, message.HtmlBody, message.TextBody);
+
+        return messageToSend;
+    }
+
+    private EmailAddress GetMailToAddress(MailMessage message)
+    {
+        EmailAddress toAddress;
+        if (_mailSettings.SendMode == MailSendMode.SendToDebugAddress)
         {
-            if (message == null) throw new ArgumentNullException(nameof(message));
-
-            var messageToSend = new SendGridMessage();
-
-            var toAddress = GetMailToAddress(message);
-            messageToSend.AddTo(toAddress);
-            messageToSend.Subject = message.Subject;
-            if (message.From != null)
+            if (string.IsNullOrEmpty(_mailSettings.DebugEmailAddress))
             {
-                messageToSend.SetFrom(CreateMailAddress(message.From.Address, message.From.DisplayName));
+                throw new Exception("MailSendMode.SendToDebugAddress requested but Cofoundry:Mail:DebugEmailAddress setting is not defined.");
             }
-            else
-            {
-                messageToSend.SetFrom(CreateMailAddress(_mailSettings.DefaultFromAddress, _mailSettings.DefaultFromAddressDisplayName));
-            }
+            toAddress = CreateMailAddress(_mailSettings.DebugEmailAddress, message.To.DisplayName);
+        }
+        else
+        {
+            toAddress = new EmailAddress(message.To.Address, message.To.DisplayName);
+        }
+        return toAddress;
+    }
 
-            SetMessageBody(messageToSend, message.HtmlBody, message.TextBody);
-
-            return messageToSend;
+    private EmailAddress CreateMailAddress(string email, string displayName)
+    {
+        // In other libraries we catch validation exceptions here, but SendGrid does not throw any so it is omitted
+        if (string.IsNullOrEmpty(displayName))
+        {
+            return new EmailAddress(email);
         }
 
-        private EmailAddress GetMailToAddress(MailMessage message)
+        return new EmailAddress(email, displayName);
+    }
+
+    private void SetMessageBody(SendGridMessage message, string bodyHtml, string bodyText)
+    {
+        var hasHtmlBody = !string.IsNullOrWhiteSpace(bodyHtml);
+        var hasTextBody = !string.IsNullOrWhiteSpace(bodyText);
+        if (!hasHtmlBody && !hasTextBody)
         {
-            EmailAddress toAddress;
-            if (_mailSettings.SendMode == MailSendMode.SendToDebugAddress)
-            {
-                if (string.IsNullOrEmpty(_mailSettings.DebugEmailAddress))
-                {
-                    throw new Exception("MailSendMode.SendToDebugAddress requested but Cofoundry:Mail:DebugEmailAddress setting is not defined.");
-                }
-                toAddress = CreateMailAddress(_mailSettings.DebugEmailAddress, message.To.DisplayName);
-            }
-            else
-            {
-                toAddress = new EmailAddress(message.To.Address, message.To.DisplayName);
-            }
-            return toAddress;
+            throw new ArgumentException("An email must have either a html or text body");
         }
 
-        private EmailAddress CreateMailAddress(string email, string displayName)
-        {
-            // In other libraries we catch validation exceptions here, but SendGrid does not throw any so it is omitted
-            if (string.IsNullOrEmpty(displayName))
-            {
-                return new EmailAddress(email);
-            }
-
-            return new EmailAddress(email, displayName);
-        }
-
-        private void SetMessageBody(SendGridMessage message, string bodyHtml, string bodyText)
-        {
-            var hasHtmlBody = !string.IsNullOrWhiteSpace(bodyHtml);
-            var hasTextBody = !string.IsNullOrWhiteSpace(bodyText);
-            if (!hasHtmlBody && !hasTextBody)
-            {
-                throw new ArgumentException("An email must have either a html or text body");
-            }
-
-            message.HtmlContent = bodyHtml;
-            message.PlainTextContent = bodyText;
-        }
+        message.HtmlContent = bodyHtml;
+        message.PlainTextContent = bodyText;
     }
 }

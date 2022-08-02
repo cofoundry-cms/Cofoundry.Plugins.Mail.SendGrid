@@ -1,23 +1,13 @@
-using Cofoundry.Web;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
+var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseLocalConfigFile();
 
-namespace SendGridExample
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            CreateHostBuilder(args).Build().Run();
-        }
+builder.Services
+    .AddRazorPages()
+    .AddCofoundry(builder.Configuration);
 
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder
-                        .UseStartup<Startup>()
-                        .UseLocalConfigFile();
-                });
-    }
-}
+var app = builder.Build();
+
+app.UseHttpsRedirection();
+app.UseCofoundry();
+
+app.Run();
