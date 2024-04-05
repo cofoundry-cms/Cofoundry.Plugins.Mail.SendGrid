@@ -1,4 +1,5 @@
-﻿using Cofoundry.Core;
+using System.Diagnostics.CodeAnalysis;
+using Cofoundry.Core;
 using Cofoundry.Core.Mail;
 using Cofoundry.Core.Mail.Internal;
 using SendGrid;
@@ -6,13 +7,16 @@ using SendGrid.Helpers.Mail;
 
 namespace Cofoundry.Plugins.Mail.SendGrid.Internal;
 
-public class SendGridMailDispatchSession : IMailDispatchSession
+/// <summary>
+/// SendGrid implementation of <see cref="IMailDispatchSession"/>.
+/// </summary>
+public sealed class SendGridMailDispatchSession : IMailDispatchSession
 {
-    private readonly Queue<SendGridMessage> _mailQueue = new Queue<SendGridMessage>();
+    private readonly Queue<SendGridMessage> _mailQueue = new();
     private readonly Core.Mail.MailSettings _mailSettings;
     private readonly SendGridSettings _sendGridSettings;
-    private readonly SendGridClient _sendGridClient;
-    private readonly DebugMailDispatchSession _debugMailDispatchSession;
+    private readonly SendGridClient? _sendGridClient;
+    private readonly DebugMailDispatchSession? _debugMailDispatchSession;
 
     public SendGridMailDispatchSession(
         Core.Mail.MailSettings mailSettings,
@@ -23,7 +27,7 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         _mailSettings = mailSettings;
         _sendGridSettings = sendGridSettings;
 
-        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+        if (IsLocalDropMode())
         {
             _debugMailDispatchSession = new DebugMailDispatchSession(mailSettings, pathResolver);
         }
@@ -33,11 +37,12 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         }
     }
 
+    /// <inheritdoc/>
     public void Add(MailMessage mailMessage)
     {
         var messageToSend = FormatMessage(mailMessage);
 
-        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+        if (IsLocalDropMode())
         {
             _debugMailDispatchSession.Add(mailMessage);
             return;
@@ -46,9 +51,10 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         _mailQueue.Enqueue(messageToSend);
     }
 
+    /// <inheritdoc/>
     public async Task FlushAsync()
     {
-        if (_mailSettings.SendMode == MailSendMode.LocalDrop)
+        if (IsLocalDropMode())
         {
             await _debugMailDispatchSession.FlushAsync();
             return;
@@ -69,9 +75,16 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         _debugMailDispatchSession?.Dispose();
     }
 
+    [MemberNotNullWhen(true, nameof(_debugMailDispatchSession))]
+    [MemberNotNullWhen(false, nameof(_sendGridClient))]
+    private bool IsLocalDropMode()
+    {
+        return _mailSettings.SendMode == MailSendMode.LocalDrop;
+    }
+
     private SendGridMessage FormatMessage(MailMessage message)
     {
-        if (message == null) throw new ArgumentNullException(nameof(message));
+        ArgumentNullException.ThrowIfNull(message);
 
         var messageToSend = new SendGridMessage();
 
@@ -110,7 +123,7 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         return toAddress;
     }
 
-    private EmailAddress CreateMailAddress(string email, string displayName)
+    private static EmailAddress CreateMailAddress(string email, string? displayName)
     {
         // In other libraries we catch validation exceptions here, but SendGrid does not throw any so it is omitted
         if (string.IsNullOrEmpty(displayName))
@@ -121,7 +134,7 @@ public class SendGridMailDispatchSession : IMailDispatchSession
         return new EmailAddress(email, displayName);
     }
 
-    private void SetMessageBody(SendGridMessage message, string bodyHtml, string bodyText)
+    private static void SetMessageBody(SendGridMessage message, string? bodyHtml, string? bodyText)
     {
         var hasHtmlBody = !string.IsNullOrWhiteSpace(bodyHtml);
         var hasTextBody = !string.IsNullOrWhiteSpace(bodyText);
